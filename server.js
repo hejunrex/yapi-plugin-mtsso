@@ -9,10 +9,10 @@ module.exports = function (options) {
       request(loginUrl + token, function (error, response, body) {
         if (!error && response.statusCode == 200) {
           let result = JSON.parse(body);
-          if (result && result.status === 'success') {
+          if (result) {
             let ret = {
-              email: result.data.email,
-              username: result.data.username
+              email: result.email,
+              username: result.username
             };
             resolve(ret);
           } else {
