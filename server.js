@@ -1,25 +1,45 @@
 const request = require('request');
 
 module.exports = function (options) {
-  const { loginUrl, emailPostfix } = options;
+  const { loginUrl } = options;
 
   this.bindHook('third_login', (ctx) => {
-    let token = ctx.request.body.token || ctx.request.query.token;
     return new Promise((resolve, reject) => {
-      request(loginUrl + token, function (error, response, body) {
-        if (!error && response.statusCode == 200) {
-          let result = JSON.parse(body);
-          if (result) {
-            let ret = {
-              email: result.email,
-              username: result.username
-            };
-            resolve(ret);
-          } else {
-            reject(result);
-          }
+      const cookieHeader = ctx.headers.cookie || '';
+      const authCookies = cookieHeader
+        .split(';')
+        .map(cookie => cookie.trim())
+        .filter(cookie =>
+          cookie.indexOf('toon_internal_user_token=') === 0 ||
+          cookie.indexOf('toon_internal_user_uuid=') === 0
+        )
+        .join('; ');
+
+      if (!authCookies) {
+        return reject(new Error('Admin login cookie not found'));
+      }
+
+      request({
+        url: loginUrl,
+        headers: { Cookie: authCookies },
+        json: true
+      }, function (error, response, result) {
+        if (error) {
+          return reject(error);
         }
-        reject(error);
+
+        if (response.statusCode !== 200) {
+          return reject(new Error('Admin user verification failed: HTTP ' + response.statusCode));
+        }
+
+        if (!result || !result.email || !result.username) {
+          return reject(new Error('Admin user response is missing email or username'));
+        }
+
+        resolve({
+          email: result.email,
+          username: result.username
+        });
       });
     });
   })
